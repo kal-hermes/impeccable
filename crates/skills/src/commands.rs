@@ -609,6 +609,11 @@ fn install(flags: &[String], io: &mut Io) -> R<()> {
                     .iter()
                     .copied()
                     .filter(|p| {
+                        // Hermes has no manifest to mark: the plugin payload's
+                        // presence in the Hermes plugin home is the marker.
+                        if *p == ".hermes" {
+                            return !hook_manifest::hermes_plugin_installed(&sys);
+                        }
                         let manifest_root = if scope == Scope::User && *p == ".claude" { &install_root } else { &hook_root };
                         !hook_installed_for_provider_at_scope(manifest_root, p, scope == Scope::User)
                     })
@@ -670,6 +675,7 @@ fn install(flags: &[String], io: &mut Io) -> R<()> {
             if !written_hook_targets.is_empty() {
                 out(io, &format!("Installed hooks into: {}", written_hook_targets.join(", ")));
             }
+            print_hermes_plugin_hint(&sys, io, &written_hook_targets);
             // A repeat user-scope install whose user hook is already current
             // never sends Claude through copy_provider_hooks, so the
             // duplicate-hook cleanup that function ends with runs here as well.
@@ -763,8 +769,26 @@ fn install(flags: &[String], io: &mut Io) -> R<()> {
     if !hook_targets.is_empty() {
         out(io, &format!("Installed hooks into: {}", hook_targets.join(", ")));
     }
+    print_hermes_plugin_hint(&sys, io, &hook_targets);
     out(io, "\nDone! Now type /impeccable init in your AI coding agent's chat (not in this terminal) to set up design context.\n");
     Ok(())
+}
+
+/// After a hook write that included Hermes: point at the one manual step.
+/// Hermes loads plugins only from its home and gates them on the
+/// `plugins.enabled` allow-list, so enabling is an explicit user command —
+/// we never rewrite the user's config.yaml.
+fn print_hermes_plugin_hint(sys: &Sys, io: &mut Io, hook_targets: &[&'static str]) {
+    if !hook_targets.contains(&".hermes") {
+        return;
+    }
+    out(
+        io,
+        &format!(
+            "Hermes plugin installed at {}. Enable it with `hermes plugins enable impeccable-design-hook`, then restart Hermes.",
+            sys.format_path_for_display(&hook_manifest::hermes_plugin_dest(sys))
+        ),
+    );
 }
 
 // ─── update ──────────────────────────────────────────────────────────────────
@@ -860,19 +884,20 @@ fn update(flags: &[String], io: &mut Io) -> R<()> {
             return Err(Flow::Throw(e));
         }
     };
-    if up_to_date {
-        let outcome: R<Vec<&'static str>> = (|| {
-            // Repair any stale pre-launcher (`node .../hook.mjs`) manifest a v3
-            // install left behind, regardless of hook consent (triage E8).
-            repair_update_hook_manifests(&sys, &hook_root, &root, &copy_providers).map_err(Flow::Throw)?;
-            let want_hooks = install_hooks && decide_hook_install(&mut prompt, io, &hook_root, &copy_providers, yes)?;
-            let hook_targets = if want_hooks {
-                copy_provider_hooks(&sys, &tmp_dir, &hook_root, &copy_providers, force, Some(&root), Some(&project_root)).map_err(Flow::Throw)?
-            } else {
-                Vec::new()
-            };
-            Ok(hook_targets)
-        })();
+            if up_to_date {
+                let outcome: R<Vec<&'static str>> = (|| {
+                    // Repair any stale pre-launcher (`node .../hook.mjs`) manifest a v3
+                    // install left behind, regardless of hook consent (triage E8).
+                    repair_update_hook_manifests(&sys, &hook_root, &root, &copy_providers).map_err(Flow::Throw)?;
+                    let want_hooks = install_hooks && decide_hook_install(&mut prompt, io, &hook_root, &copy_providers, yes)?;
+                    let hook_targets = if want_hooks {
+                        copy_provider_hooks(&sys, &tmp_dir, &hook_root, &copy_providers, force, Some(&root), Some(&project_root)).map_err(Flow::Throw)?
+                    } else {
+                        Vec::new()
+                    };
+                    print_hermes_plugin_hint(&sys, io, &hook_targets);
+                    Ok(hook_targets)
+                })();
         util::rm_rf(&tmp_dir);
         return match outcome {
             Ok(hook_targets) => {
@@ -934,6 +959,7 @@ fn update(flags: &[String], io: &mut Io) -> R<()> {
         if !hook_targets.is_empty() {
             out(io, &format!("Installed hooks into: {}", hook_targets.join(", ")));
         }
+        print_hermes_plugin_hint(&sys, io, &hook_targets);
         out(io, "Done!\n");
         Ok(())
     })();

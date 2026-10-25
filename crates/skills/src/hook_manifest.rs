@@ -631,6 +631,14 @@ pub fn copy_provider_hooks(sys: &crate::providers::Sys, bundle_dir: &str, root: 
     let user_scope = sys.is_home_dir(skill_root);
     let mut written: Vec<&'static str> = Vec::new();
     for provider in providers {
+        // Hermes: no manifest — the design hook is a plugin payload copied
+        // into the Hermes plugin home (see install_hermes_plugin).
+        if *provider == ".hermes" {
+            if install_hermes_plugin(sys, bundle_dir, force)? && !written.contains(provider) {
+                written.push(provider);
+            }
+            continue;
+        }
         let manifest_root = if user_scope && *provider == ".claude" { skill_root } else { root };
         for artifact in hook_artifacts_for_install(bundle_dir, manifest_root, provider, user_scope) {
             if !util::exists(&artifact.src) {
@@ -792,4 +800,56 @@ pub fn set_hook_consent(root: &str, value: &str) -> Result<String, String> {
 /// JS: impeccable-config.mjs#getHookConsent(root)
 pub fn get_hook_consent(root: &str) -> Option<String> {
     impeccable_detect::config::get_hook_consent(root)
+}
+
+// ── Hermes plugin (design hook) ────────────────────────────────────────────
+//
+// Hermes has no project-local hook manifest: its design hook is a Python
+// plugin (`<hermes home>/plugins/impeccable-design-hook/`) that drives the
+// same launcher verb through Hermes' `transform_tool_result` (per-edit pass)
+// and `pre_verify` (Stop deep pass) plugin hooks. The payload ships inside
+// the hermes skill variant (`<skill>/hermes-plugin/`), so install and update
+// both carry it. Hermes loads plugins only from its (global) home, so even a
+// project-scope `.hermes` skill install wires the plugin globally. Enabling
+// is one explicit command we print, never a config.yaml rewrite we make on
+// the user's behalf: `hermes plugins enable impeccable-design-hook`.
+
+pub const HERMES_PLUGIN_NAME: &str = "impeccable-design-hook";
+pub const HERMES_PLUGIN_FILES: [&str; 2] = ["plugin.yaml", "__init__.py"];
+
+/// `<hermes home>/plugins/impeccable-design-hook`
+pub fn hermes_plugin_dest(sys: &Sys) -> String {
+    jsp::join(&[
+        crate::providers::hermes_global_home(&sys.env, &sys.cwd, &sys.home).as_str(),
+        "plugins",
+        HERMES_PLUGIN_NAME,
+    ])
+}
+
+/// True when every plugin file is present in the Hermes plugin home.
+pub fn hermes_plugin_installed(sys: &Sys) -> bool {
+    let dir = hermes_plugin_dest(sys);
+    HERMES_PLUGIN_FILES.iter().all(|f| util::exists(&jsp::join(&[dir.as_str(), f])))
+}
+
+/// Copy the bundled plugin payload (`<bundle>/.hermes/skills/impeccable/hermes-plugin/`)
+/// into the Hermes plugin home. Idempotent: a no-op when already installed
+/// unless `force` (which refreshes the payload, like a --force skill refresh).
+/// Returns true when files were written.
+pub fn install_hermes_plugin(sys: &Sys, bundle_dir: &str, force: bool) -> Result<bool, String> {
+    if !force && hermes_plugin_installed(sys) {
+        return Ok(false);
+    }
+    let src_base = jsp::join(&[bundle_dir, ".hermes", "skills", "impeccable", "hermes-plugin"]);
+    let dest_dir = hermes_plugin_dest(sys);
+    for file in HERMES_PLUGIN_FILES {
+        let src = jsp::join(&[src_base.as_str(), file]);
+        if !util::exists(&src) {
+            return Err(format!("Bundled Hermes plugin is missing {file}; the bundle is incomplete."));
+        }
+        let dest = jsp::join(&[dest_dir.as_str(), file]);
+        util::mkdir_p(&jsp::dirname(&dest))?;
+        util::write_bytes(&dest, &util::read_bytes(&src)?)?;
+    }
+    Ok(true)
 }

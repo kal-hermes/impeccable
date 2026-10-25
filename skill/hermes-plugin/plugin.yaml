@@ -1,0 +1,7 @@
+name: impeccable-design-hook
+version: 0.1.0
+description: "Impeccable design detector wired into Hermes Agent's plugin hooks. Per-edit pass: appends design findings to write_file/patch results (transform_tool_result, Claude Code PostToolUse contract). Stop pass: runs the deep detector pass at the turn's verify gate and keeps the turn going while findings remain (pre_verify, Codex Stop contract). Installed by `npx impeccable install` with the impeccable skill; enable with `hermes plugins enable impeccable-design-hook`."
+author: "Impeccable"
+provides_hooks:
+  - transform_tool_result
+  - pre_verify

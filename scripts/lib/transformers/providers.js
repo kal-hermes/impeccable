@@ -207,9 +207,11 @@ export const PROVIDERS = {
     // (license, compatibility, metadata) are spec-defined; harness-specific
     // extensions (user-invocable, argument-hint, allowed-tools) are NOT
     // recognized by the Hermes skill loader and would be silently ignored.
-    // Hermes also has no hook surface, no equivalent of Claude's slash
-    // commands, and no per-skill tool ACL -- so no emitHooks, no agentFormat,
-    // no writeOpenAIMetadata. See hermes-agent/SKILL.md "Skills" section.
+    // Hermes has no project-local hook manifest: its design hook is a Python
+    // plugin the installer writes into the Hermes plugin home. The payload
+    // ships inside the hermes skill variant (skill/hermes-plugin/, emitted
+    // for the hermes provider only) — no emitHooks, no agentFormat, no
+    // writeOpenAIMetadata. See hermes-agent/SKILL.md "Skills" section.
     frontmatterFields: ['license', 'compatibility', 'metadata'],
   },
 };

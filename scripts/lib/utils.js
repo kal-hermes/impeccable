@@ -314,6 +314,22 @@ export function readSourceFiles(rootDir) {
     }
   }
 
+  // Hermes plugin payload (skill/hermes-plugin/): shipped verbatim inside the
+  // hermes skill dir; the skills installer copies it into the Hermes plugin home.
+  // Two raw files, no per-provider transforms, so it is read like the scripts.
+  const hermesPlugin = [];
+  const hermesPluginDir = path.join(skillDir, 'hermes-plugin');
+  if (fs.existsSync(hermesPluginDir)) {
+    for (const pluginFile of fs.readdirSync(hermesPluginDir).sort()) {
+      const pluginPath = path.join(hermesPluginDir, pluginFile);
+      if (!fs.statSync(pluginPath).isFile()) continue;
+      hermesPlugin.push({
+        name: pluginFile,
+        content: fs.readFileSync(pluginPath, 'utf-8'),
+      });
+    }
+  }
+
   skills.push({
     name: frontmatter.name || 'impeccable',
     description: frontmatter.description || '',
@@ -328,7 +344,8 @@ export function readSourceFiles(rootDir) {
     filePath: skillMdPath,
     references,
     scripts,
-    agents
+    agents,
+    hermesPlugin
   });
 
   return { skills };

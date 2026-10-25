@@ -383,6 +383,18 @@ export function createTransformer(config) {
         }
       }
 
+      // Ship the Hermes plugin payload verbatim inside the hermes skill dir.
+      // The skills installer (crates/skills) copies these two files into the
+      // Hermes plugin home (`<hermes home>/plugins/impeccable-design-hook/`)
+      // when the design hook is installed for Hermes.
+      if (provider === 'hermes' && skill.hermesPlugin?.length) {
+        const pluginOutDir = path.join(skillDir, 'hermes-plugin');
+        ensureDir(pluginOutDir);
+        for (const pluginFile of skill.hermesPlugin) {
+          writeFile(path.join(pluginOutDir, pluginFile.name), pluginFile.content);
+        }
+      }
+
       // Bundle the Codex subagent .toml inside the skill's agents/ folder for the
       // variants Codex loads as a skill. Codex auto-discovers agents nested in an
       // installed skill, so this in-skill copy is the whole delivery -- the
