@@ -2885,6 +2885,24 @@ fn codex_stop_emits_decision_block() {
     assert!(out.get("hookSpecificOutput").is_none());
 }
 
+#[test]
+fn hermes_harness_shapes_each_pass() {
+    // The Hermes plugin sends one harness value for both passes: the per-edit
+    // pass keeps Claude's additional-context shape (the plugin parses it),
+    // and the Stop pass emits the top-level blocking decision Hermes'
+    // pre_verify gate parses natively.
+    assert_eq!(resolve_harness(
+        &rt_with("/p", env(&[("IMPECCABLE_HOOK_HARNESS", "hermes")])),
+        Some(&Map::new()),
+    ), "hermes");
+    assert_eq!(
+        payload("t", "PostToolUse", "hermes"),
+        r#"{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"t"}}"#
+    );
+    assert_eq!(payload("findings", "Stop", "hermes"), r#"{"decision":"block","reason":"findings"}"#);
+    assert_eq!(payload("  ", "Stop", "hermes"), "");
+}
+
 // ── live-preview stand-down ───────────────────────────────────────────────
 //
 // A live variant session owns files carrying preview scaffolding

@@ -2,7 +2,10 @@
 plugin-hook systems.
 
 Two passes, mirroring the reference Claude Code integration (`.claude/settings.json`)
-on Hermes' hook surface:
+on Hermes' hook surface. Both run the engine's ``hook`` verb with the native
+``IMPECCABLE_HOOK_HARNESS=hermes`` harness, which emits the output shape each pass
+needs (engine 0.1.17 or later; on older engines the stop pass silently no-ops —
+point ``IMPECCABLE_DESIGN_HOOK_BIN`` at a current build):
 
 - **Per-edit pass** (`transform_tool_result` on ``write_file`` / ``patch``): runs the
   Impeccable engine with a Claude-Code ``PostToolUse`` event and appends its findings
@@ -226,7 +229,9 @@ def _on_transform_tool_result(
             "cwd": str(resolved[0]),
             "session_id": session_id,
         },
-        harness="claude",
+        # The engine's native hermes harness emits the PostToolUse
+        # additional-context shape this plugin parses.
+        harness="hermes",
         cwd=resolved[0],
         launcher=resolved[1],
         timeout=_PER_EDIT_TIMEOUT_S,
@@ -261,7 +266,10 @@ def _on_pre_verify(
             "cwd": str(resolved[0]),
             "session_id": session_id,
         },
-        harness="codex",
+        # The engine's native hermes harness emits the Stop blocking
+        # decision ({"decision": "block", "reason": ...}) that Hermes'
+        # pre_verify gate parses natively.
+        harness="hermes",
         cwd=resolved[0],
         launcher=resolved[1],
         timeout=_STOP_TIMEOUT_S,
