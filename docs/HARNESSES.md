@@ -18,6 +18,7 @@ Last verified: 2026-04-28 (subagent landscape spot-checked 2026-06-28; Mistral V
 | DeepSeek Harness | https://github.com/deepseek-ai/deepseek-harness |
 | Gemini CLI | https://geminicli.com/docs/cli/skills/ |
 | Codex CLI | https://developers.openai.com/codex/skills |
+| Replit Agent | https://docs.replit.com/replitai/skills |
 | GitHub Copilot (Agents) | https://code.visualstudio.com/docs/copilot/customization/agent-skills |
 | Kiro | https://kiro.dev/docs/skills/ |
 | OpenCode | https://opencode.ai/docs/skills/ |
@@ -29,6 +30,7 @@ Last verified: 2026-04-28 (subagent landscape spot-checked 2026-06-28; Mistral V
 | Grok Build | https://docs.x.ai/build/features/skills-plugins-marketplaces |
 | Hermes Agent | https://hermes-agent.nousresearch.com/docs/ |
 | Antigravity | https://antigravity.google/docs/skills |
+| Devin | https://docs.devin.ai/cli/extensibility/skills/overview |
 
 ## Spec Compliance
 
@@ -68,6 +70,7 @@ Notes:
 - OpenCode 1.18.10 recognises only the spec subset on SKILL.md (`name`, `description`, `license`, `compatibility`, `metadata`). Claude-style extensions (`user-invocable`, `argument-hint`, `allowed-tools`, `model`, `agent`) are silently ignored; Impeccable still emits them today for other harnesses, but they have no effect in OpenCode. Use `commands/<name>.md` (see Placeholder / Variable Substitution below) for slash UX; OpenCode honours only `description`, `agent`, `model`, `variant`, `subtask` on command files.
 - DeepSeek Harness parses the Agent Skills frontmatter and requires `name` and `description`; it reads `metadata`, `user-invocable`, and `disable-model-invocation`. Spec fields it does not consume (`license`, `compatibility`, `allowed-tools`) and Claude-style extensions (`argument-hint`, `model`, `effort`, `context`, `agent`, `hooks`) are silently ignored. Hooks are in-process plugins configured via cordis.yml, not on-disk manifests, so there is no hook surface to install. Subagents exist but are composed from preset config, not an on-disk skill-adjacent format. Verified against the [filesystem skill provider](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/skill/skill-filesystem/README.md).
 - Oh My Pi supports standard Agent Skills frontmatter fields and `disable-model-invocation`; other harness-specific extensions are ignored.
+- Devin's skill frontmatter carries `name`, `description`, `argument-hint`, `allowed-tools`, `triggers`, `model`, `subagent`, `agent`, and `permissions` (the last four are documented for the CLI). It has no `user-invocable`; `triggers` defaults to user and model, so Impeccable omits it. The CLI docs describe `allowed-tools` as an auto-approve list and the web docs as a restriction, and Impeccable's Claude-syntax entries match no Devin tool (`read`, `grep`, `glob`, `exec`), so Impeccable omits it too. The CLI has lifecycle hooks (`.devin/hooks.v1.json`, plus Claude-format hooks read from `.claude/settings.json`) and subagent profiles (`.devin/agents/`, `.agents/agents/`, `~/.config/devin/agents/`, same frontmatter as skills with Devin tool names); Impeccable targets neither yet, so Devin gets the skill without an edit hook and runs the agent roles inline from `reference/degraded/`. Verified 2026-10-26 against the bundled docs of Devin CLI 3000.11.205 and [docs.devin.ai](https://docs.devin.ai/cli/extensibility/skills/overview).
 - Unknown fields are silently ignored by all harnesses.
 
 ## Hook surface used by Impeccable
@@ -80,6 +83,7 @@ Notes:
 | Grok Build | Yes (`PostToolUse`) | No | `.grok/hooks/impeccable.json` | Project-local manifest installed with `.grok/skills/impeccable`. Claude-compatible matchers (`Edit\|Write\|MultiEdit`) alias to Grok `search_replace`. PostToolUse runs the scan and warms the session cache; Grok ignores that stdout. Stop `additionalContext` is the user-visible pass. Ignore Grok's observe-only Stop with `reason: "shutdown"`. Requires `/hooks-trust` or `--trust`. Plugin installs use `plugin/hooks/hooks.json` with `${CLAUDE_PLUGIN_ROOT}` (aliased to `GROK_PLUGIN_ROOT`). |
 | Hermes Agent | Yes (`transform_tool_result` + `pre_verify` plugin hooks) | No | `<hermes home>/plugins/impeccable-design-hook/` | Hermes has no project-local hook manifest. `npx impeccable install/update --providers=hermes` copies the plugin payload bundled inside the hermes skill variant (`<skill>/hermes-plugin/`) into the Hermes plugin home, then prints one enable command (`hermes plugins enable impeccable-design-hook`) — the plugin is allow-list gated, and we never rewrite the user's `config.yaml`. Both passes run the launcher `hook` verb with the native `IMPECCABLE_HOOK_HARNESS=hermes` value: the per-edit pass (`transform_tool_use` on `write_file`/`patch`) gets the additional-context shape, and the Stop pass (`pre_verify`, bounded by Hermes' `max_verify_nudges`) gets the top-level blocking decision. Both passes share the Hermes session id, so the engine's own session cache dedupes findings across them. The detector config stays project-local (`.impeccable/config.json`); `impeccable hooks off` silences a project as usual. |
 | Oh My Pi | No | No | n/a | Runtime hooks use `pi-extension`; no `hooks.json` manifest surface. |
+| Devin | No | No | n/a | Devin CLI discovers `.devin/hooks.v1.json` and Claude-format `.claude/settings.json` hooks; Impeccable does not install a Devin manifest yet. |
 | All other harnesses | No | No | n/a | No documented hook surface today. Skill and commands still ship. |
 
 ## Skill Directory Structure
@@ -91,6 +95,7 @@ Notes:
 | DeepSeek Harness | `.dsh/skills/` (project), `~/.dsh/skills/` (global; `$DSH_HOME/skills` when set) | `.agents/skills/` (project), `~/.agents/skills/` (global) |
 | Gemini CLI | `.gemini/skills/` | `.agents/skills/` |
 | Codex CLI | `.agents/skills/` (primary) | - |
+| Replit Agent | `.agents/skills/` (primary, shared with Codex CLI) | - |
 | GitHub Copilot | `.github/skills/` | `.agents/skills/`, `.claude/skills/` |
 | Kiro | `.kiro/skills/` | - |
 | OpenCode | `.opencode/skills/` | `.agents/skills/`, `.claude/skills/` |
@@ -104,6 +109,7 @@ Notes:
 | Grok Build | `.grok/skills/` (project), `~/.grok/skills/` (global) | `.agents/skills/`, `.claude/skills/`, `.cursor/skills/` (Claude/Cursor compat, configurable) |
 | Hermes Agent | `.hermes/skills/` (project), `~/.hermes/skills/` (global) | `skills.external_dirs` config (no automatic `.agents/skills/` fallback) |
 | Antigravity | `.agent/skills/` (project), `~/.gemini/config/skills/` (global) | `.agents/skills/` (project), `~/.agents/skills/` (global) |
+| Devin | `.devin/skills/` (project), `~/.config/devin/skills/` (global, shared by CLI and Desktop; `%APPDATA%\devin\skills\` on Windows) | `.agents/skills/` and `.cognition/skills/` (project), `~/.agents/skills/` and `~/.config/cognition/skills/` (global), `.windsurf/skills/` (legacy), `~/.codeium/windsurf/skills/` (Desktop legacy global). The CLI also imports `.claude/skills/`, `.cursor/skills/`, and `.github/skills/` through `read_config_from`; Devin web scans `.github/skills/`, `.claude/skills/`, `.cognition/skills/`, and `.windsurf/skills/` |
 
 All harnesses support the `{skill-name}/SKILL.md` directory structure with optional `reference/`, `scripts/`, and `assets/` subdirectories.
 

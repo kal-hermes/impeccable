@@ -1167,6 +1167,11 @@ fn cache_round_trip_and_gc() {
     let mut b = a.clone();
     b.extras.insert("ignoreValue".into(), json!("Roboto"));
     assert_ne!(finding_cache_key(&a), finding_cache_key(&b));
+    // a colour pair that gains a copy is the same finding (r14-t2)
+    let pair = f("low-contrast", 0.0, "L", "d", "2.3:1 (need 4.5:1) — text #aaaaaa on #ffffff (and 2 more)");
+    let mut more = pair.clone();
+    more.snippet = "2.3:1 (need 4.5:1) — text #aaaaaa on #ffffff (and 3 more)".into();
+    assert_eq!(finding_cache_key(&pair), finding_cache_key(&more));
     // gc: 10 sessions -> newest 8 kept
     let mut big = read_cache(&cwd);
     for i in 0..10 {

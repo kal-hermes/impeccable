@@ -179,8 +179,8 @@ function loadConsolidatedFixture() {
       message: 'make the title more direct for the expense dashboard',
       sourceFile: ROUTE_FILE,
       target: { classes: 'hero-title', tag: 'h1' },
-      expectSelector: 'h1.hero-title[data-impeccable-steer="e2e"]',
-      expectSourceContains: 'data-impeccable-steer="e2e"',
+      expectSelector: 'h1.hero-title[data-e2e-steer="e2e"]',
+      expectSourceContains: 'data-e2e-steer="e2e"',
     },
     probe: {
       expectLiveInit: true,

@@ -982,7 +982,11 @@ pub fn finding_cache_key(f: &Finding) -> String {
     if !value.is_empty() {
         return format!("{}:0:{}", f.antipattern, value);
     }
-    let snippet = slice_prefix(js::trim(&f.snippet), 80);
+    // A finding that counts the copies it speaks for is the same finding
+    // when the count moves: one more link wearing a reported colour pair is
+    // not a new finding to repeat.
+    let (uncounted, _) = impeccable_core::checks::rules::split_more_count(&f.snippet);
+    let snippet = slice_prefix(js::trim(&uncounted), 80);
     if snippet.is_empty() {
         format!("{}:0", f.antipattern)
     } else {
